@@ -1,517 +1,137 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "main.h"
-#include "population.h"
-#include "initialization.h"
-#include "fitness.h"
-#include "selection.h"
-#include "crossing.h"
-#include "mutation.h"
-#include "print.h"
+#include <math.h>
+#include <float.h> // Para DBL_MAX
+#include "../include/main.h"
 
 /*
-    -----------------------------------
-              updatePop()
-    -----------------------------------
-
-    This function:
-    - In this function we will update the population;
-    - so the population[i] will be updated to nextpop[i];
+================================================================================
+PROTÓTIPOS DE FUNÇÕES EXTERNAS
+(Funções que este arquivo chama, mas que estão em outros .c)
+================================================================================
 */
-void updatePop(Individual *subPop, Individual *nextSubPop)
-{
-    for (int i = 0; i < SUBPOP_SIZE; i++)
-    {
-        subPop[i].id = nextSubPop[i].id;
-        subPop[i].fitnessDistance = nextSubPop[i].fitnessDistance;
-        subPop[i].fitnessTime = nextSubPop[i].fitnessTime;
-        subPop[i].fitnessFuel = nextSubPop[i].fitnessFuel;
-        subPop[i].fitness = nextSubPop[i].fitness;
+// De crossing.c
+void crossing(Individual *parent1, Individual *parent2, Individual *son);
+// De mutation.c
+void mutation(Individual *ind);
+// De initialization.c
+void distributeSubpopulation(Individual *population_ptr);
 
-        for (int j = 0; j < NUM_VEHICLES; j++)
+/*
+================================================================================
+1. ELITISMO (Adaptado para MOKP - Maximização)
+   Encontra os 'N' melhores indivíduos de uma sub-população
+   e os copia para o bloco da próxima geração.
+================================================================================
+*/
+void findElitism(Individual *subPop, Individual *nextPopBlock, int objective_index)
+{
+    // Array para marcar quais indivíduos já foram escolhidos (0 = não, 1 = sim)
+    int used_indices[SUBPOP_SIZE] = {0}; 
+
+    // Loop para escolher os 'N' melhores (N = ELITISM_SIZE_POP)
+    for (int e = 0; e < ELITISM_SIZE_POP; e++)
+    {
+        double best_fitness = -DBL_MAX; // Inicia com o pior fitness (pois queremos MAXIMIZAR o lucro)
+        int best_index = -1;
+
+        // 1. Encontra o melhor indivíduo (que ainda não foi pego)
+        for (int i = 0; i < SUBPOP_SIZE; i++)
         {
-            for (int k = 0; k < NUM_CLIENTS + 1; k++)
+            // (Verifica se não foi usado) E (Se o fitness dele é MAIOR que o melhor atual)
+            if (used_indices[i] == 0 && subPop[i].fitness[objective_index] > best_fitness)
             {
-                subPop[i].route[j][k] = nextSubPop[i].route[j][k];
+                best_fitness = subPop[i].fitness[objective_index];
+                best_index = i;
             }
         }
-    }
-
-    // Resetting all individuals from nextPop
-    for (int i = 0; i < SUBPOP_SIZE; i++)
-    {
-        nextSubPop[i].id = -1;
-
-        nextSubPop[i].fitnessDistance = 0;
-        nextSubPop[i].fitnessTime = 0;
-        nextSubPop[i].fitnessFuel = 0;
-        nextSubPop[i].fitness = 0;
-
-        for (int j = 0; j < NUM_VEHICLES; j++)
+        
+        // 2. Copia o melhor indivíduo encontrado para a próxima população
+        if (best_index != -1)
         {
-            for (int k = 0; k < NUM_CLIENTS + 1; k++)
-            {
-                nextSubPop[i].route[j][k] = 0;
-            }
-        }
-    }
-}
-
-int resetSon(Individual *subPop)
-{
-    for (int i = 0; i < 1; i++)
-    {
-        subPop[i].id = -1;
-
-        subPop[i].fitnessDistance = 0;
-        subPop[i].fitnessTime = 0;
-        subPop[i].fitnessFuel = 0;
-        subPop[i].fitness = 0;
-
-        for (int j = 0; j < NUM_VEHICLES; j++)
-        {
-            for (int k = 0; k < NUM_CLIENTS + 1; k++)
-            {
-                subPop[i].route[j][k] = 0;
-            }
+            nextPopBlock[e] = subPop[best_index]; // Cópia da struct inteira
+            used_indices[best_index] = 1;         // Marca como usado
         }
     }
 }
 
 /*
-    -----------------------------------
-            compareSonSubPop()
-    -----------------------------------
-
-    This function:
-    - In this function we will compare the son that is generated in the crossing with every subpopulation;
-    - If the son had a fitness smaller than at least one individual of that subpopulation, the son is put on the next generation of that one subpopulation;
+================================================================================
+2. FUNÇÃO PRINCIPAL DE ELITISMO
+   Gerencia o elitismo para TODAS as sub-populações.
+================================================================================
 */
-int compareSonSubPop(Individual *newSon, Individual *subPop, Individual *nextPop, int *previousHighestFitnessID, int index, int individual)
+void elitism()
 {
-
-    int replaced = 0;
-
-    // Then we will replace the individual if it have a higher fitness
-    switch (index)
-    {
-    case 0:
-
-        if (newSon[0].fitnessDistance < subPop[individual].fitnessDistance)
-        {
-            // printf("\nIntroduzindo Filho na NEXTSUBPOPDISTANCE\n");
-            // printf("Fitness do individuo subst: %f\n", subPop[individual].fitnessDistance);
-            *previousHighestFitnessID = subPop[individual].id;
-            // printf("Id do individuo (que não aparecerá na nextPOP distance): %d\n", *previousHighestFitnessID);
-            for (int j = 0; j < NUM_VEHICLES; j++)
-            {
-                for (int k = 0; k < NUM_CLIENTS + 1; k++)
-                {
-                    nextPop[individual].route[j][k] = newSon[0].route[j][k];
-                }
-            }
-
-            nextPop[individual].id = newSon[0].id;
-            nextPop[individual].fitnessDistance = newSon[0].fitnessDistance;
-
-            // printf("Id do individuo na nextPop: %d\n", nextPop[individual].id);
-            // printf("Fitness do individuo na nextPop: %f\n", nextPop[individual].fitnessDistance);
-
-            replaced = 1;
-
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-
-        break;
-
-    case 1:
-
-        if (newSon[0].fitnessTime < subPop[individual].fitnessTime)
-        {
-          
-            *previousHighestFitnessID = subPop[individual].id;
-
-            for (int j = 0; j < NUM_VEHICLES; j++)
-            {
-                for (int k = 0; k < NUM_CLIENTS + 1; k++)
-                {
-                    nextPop[individual].route[j][k] = newSon[0].route[j][k];
-                }
-            }
-
-            nextPop[individual].id = newSon[0].id;
-            nextPop[individual].fitnessTime = newSon[0].fitnessTime;
-
-
-            replaced = 1;
-
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-
-        break;
-
-    case 2:
-
-        if (newSon[0].fitnessFuel < subPop[individual].fitnessFuel)
-        {
-            
-            *previousHighestFitnessID = subPop[individual].id;
-
-            for (int j = 0; j < NUM_VEHICLES; j++)
-            {
-                for (int k = 0; k < NUM_CLIENTS + 1; k++)
-                {
-                    nextPop[individual].route[j][k] = newSon[0].route[j][k];
-                }
-            }
-
-            nextPop[individual].id = newSon[0].id;
-            nextPop[individual].fitnessFuel = newSon[0].fitnessFuel;
-
-
-            replaced = 1;
-
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-
-        break;
-
-    case 3:
-
-        if (newSon[0].fitness < subPop[individual].fitness)
-        {
-            
-            *previousHighestFitnessID = subPop[individual].id;
-
-            for (int j = 0; j < NUM_VEHICLES; j++)
-            {
-                for (int k = 0; k < NUM_CLIENTS + 1; k++)
-                {
-                    nextPop[individual].route[j][k] = newSon[0].route[j][k];
-                }
-            }
-
-            nextPop[individual].id = newSon[0].id;
-            nextPop[individual].fitness = newSon[0].fitness;
-
-
-            replaced = 1;
-
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-
-        break;
-
-    default:
-        break;
-    }
-
-    return 0;
-}
-
-/*
-    -----------------------------------
-              evolvePop()
-    -----------------------------------
-
-    This function:
-    - The population will be evolved until the limit of generations is reached or the optimal solution is found;
-*/
-
-void evolvePop(int rodada, int *populationFitness, Individual *population, Individual *newSon, int *tournamentFitness, Individual *tournamentIndividuals, Individual *subpop1, Individual *subpop2, int startIndex, int *idTrack, int *previousHighestFitnessDistanceID, int *previousHighestFitnessTimeID,
-               int *previousHighestFitnessFuelID, int *previousHighestFitnessWeightingID)
-{
-    int *index = &startIndex;
-
-    // Selection of the Elite of each subpopulation and put in nextPop
-    selectElite(subPopDistance, nextSubPopDistance, 0);
-    selectElite(subPopTime, nextSubPopTime, 1);
-    selectElite(subPopFuel, nextSubPopFuel, 2);
-    selectElite(subPopWeighting, nextSubPopWeighting, 3);
-
-    // For the first 5 generations we will complete the nextPop with new sons without comparing with the individuals already present in the current population, so that way we can guarantee the diversity
-    if (startIndex < GENERATIONS_BEFORE_COMPARATION)
-    {
-
-        for (int i = ELITISM_SIZE_POP; i < SUBPOP_SIZE; i++)
-        {
-            subPopSelection(tournamentIndividuals, parent, tournamentFitness, subpop1, subpop2);
-
-            // Crossing between the parents
-            switch (CROSSINGTYPE)
-            {
-            case 1:
-                onePointCrossing(index, parent, newSon, idTrack);
-                break;
-
-            case 2:
-                twoPointCrossing(index, parent, newSon);
-                break;
-            }
-
-            mutation(newSon, startIndex);
-
-            // Calculating the fitness of the son
-            fitnessDistance(newSon, 0);
-            fitnessTime(newSon, 0);
-            fitnessFuel(newSon, 0);
-            fitness(newSon, 0);
-
-            // Introducing the new son in the nextPop
-            nextSubPopDistance[i] = newSon[0];
-            nextSubPopTime[i] = newSon[0];
-            nextSubPopFuel[i] = newSon[0];
-            nextSubPopWeighting[i] = newSon[0];
-
-            // Reseting newSon
-            resetSon(newSon);
-        }
-    }
-    else
-    {
-        for (int i = ELITISM_SIZE_POP; i < SUBPOP_SIZE; i++)
-        {
-            int findBetterDist = 0;
-            int findBetterTime = 0;
-            int findBetterFuel = 0;
-            int findBetterWeight = 0;
-
-            // colocar um limite para quando isso vai rodar, se nao encontrar, precisa fazer com que complete ela daquele jeito
-            for (int j = 0; j < 5; j++)
-            {
-
-                subPopSelection(tournamentIndividuals, parent, tournamentFitness, subpop1, subpop2);
-
-                switch (CROSSINGTYPE)
-                {
-                case 1:
-                    onePointCrossing(index, parent, newSon, idTrack);
-                    break;
-
-                case 2:
-                    twoPointCrossing(index, parent, newSon);
-                    break;
-                }
-
-                mutation(newSon, startIndex);
-
-                fitnessDistance(newSon, 0);
-                fitnessTime(newSon, 0);
-                fitnessFuel(newSon, 0);
-                fitness(newSon, 0);
-
-                if (findBetterDist != 1)
-                {
-                    findBetterDist = compareSonSubPop(newSon, subPopDistance, nextSubPopDistance, previousHighestFitnessDistanceID, 0, i);
-
-                    if (findBetterDist == 0)
-                    {
-                        nextSubPopDistance[i] = subPopDistance[i];
-                    }
-                }
-
-                if (findBetterTime != 1)
-                {
-                    findBetterTime = compareSonSubPop(newSon, subPopTime, nextSubPopTime, previousHighestFitnessTimeID, 1, i);
-
-                    if (findBetterTime == 0)
-                    {
-                        nextSubPopTime[i] = subPopTime[i];
-                    }
-                }
-
-                if (findBetterFuel != 1)
-                {
-                    findBetterFuel = compareSonSubPop(newSon, subPopFuel, nextSubPopFuel, previousHighestFitnessFuelID, 2, i);
-
-                    if (findBetterFuel == 0)
-                    {
-                        nextSubPopFuel[i] = subPopFuel[i];
-                    }
-                }
-
-                if (findBetterWeight != 1)
-                {
-                    findBetterWeight = compareSonSubPop(newSon, subPopWeighting, nextSubPopWeighting, previousHighestFitnessWeightingID, 3, i);
-
-                    if (findBetterWeight == 0)
-                    {
-                        nextSubPopWeighting[i] = subPopWeighting[i];
-                    }
-                }
-
-                if (findBetterDist == 1 && findBetterTime == 1 && findBetterFuel == 1 && findBetterWeight == 1)
-                {
-                    break;
-                }
-
-                // printf("findBetterDist : %d\n", findBetterDist);
-                // printf("findBetterTime : %d\n", findBetterTime);
-                // printf("findBetterFuel : %d\n", findBetterFuel);
-                // printf("findBetterWeight : %d\n", findBetterWeight);
-
-                // Zerando os valores de newSon
-                resetSon(newSon);
-            }
-        }
-    }
-
-    updatePop(subPopDistance, nextSubPopDistance);
-    updatePop(subPopTime, nextSubPopTime);
-    updatePop(subPopFuel, nextSubPopFuel);
-    updatePop(subPopWeighting, nextSubPopWeighting);
-
+    // Bloco 1: Elitismo da subpop1 (foco no obj 0)
+    // Salva os melhores em nextPop[0] até nextPop[ELITISM_SIZE_POP - 1]
+    findElitism(subpop1, &nextPop[0], 0);
     
+    // Bloco 2: Elitismo da subpop2 (foco no obj 1)
+    // Salva os melhores em nextPop[SUBPOP_SIZE] até nextPop[SUBPOP_SIZE + ELITISM_SIZE_POP - 1]
+    findElitism(subpop2, &nextPop[SUBPOP_SIZE], 1);
+    
+    // Bloco 3: Elitismo da subpop3 (foco no obj 2)
+    // Salva os melhores em nextPop[SUBPOP_SIZE * 2] até nextPop[SUBPOP_SIZE * 2 + ELITISM_SIZE_POP - 1]
+    findElitism(subpop3, &nextPop[SUBPOP_SIZE * 2], 2);
 }
 
-void printFilho(Individual *subPop)
+/*
+================================================================================
+3. EVOLUÇÃO DA POPULAÇÃO
+   Cria os novos filhos (cruzamento + mutação) para preencher
+   o resto da próxima geração.
+================================================================================
+*/
+void evolvePop()
 {
-    for (int i = 0; i < 1; i++)
+    // Loop 3x, uma vez para cada sub-população
+    for (int sub_idx = 0; sub_idx < NUM_SUBPOP; sub_idx++)
     {
-        printf("Id: %d\n", subPop[i].id);
-        printf("fitness dist: %.4f\n", subPop[i].fitnessDistance);
-        printf("fitness Time: %.4f\n", subPop[i].fitnessTime);
-        printf("fitness Fuel: %.4f\n", subPop[i].fitnessFuel);
-        printf("fitness Ponderado: %.4f\n", subPop[i].fitness);
+        // 1. Define os "blocos" de memória para esta sub-população
+        int pop_offset = sub_idx * SUBPOP_SIZE;
+        Individual *current_parents = &parent[pop_offset];    // Pais desta sub-pop (da selection.c)
+        Individual *next_gen_pop = &nextPop[pop_offset]; // Próxima geração desta sub-pop
 
-        for (int j = 0; j < NUM_VEHICLES; j++)
+        // 2. Loop para criar os novos filhos (começa DEPOIS do elitismo)
+        for (int i = ELITISM_SIZE_POP; i < SUBPOP_SIZE; i++)
         {
-            for (int k = 0; k < NUM_CLIENTS + 1; k++)
-            {
-                printf("%d ", subPop[i].route[j][k]);
-            }
-            printf("\n");
+            // 3. Pega dois pais do bloco de pais desta sub-população
+            Individual *parent1 = &current_parents[i];
+            Individual *parent2 = &current_parents[rand() % SUBPOP_SIZE]; // Pega um aleatório do mesmo bloco
+
+            // 4. Crossover (já chama o 'repair' dentro dele)
+            // 'newSon' é um buffer global (definido em initialization.c)
+            crossing(parent1, parent2, newSon);
+            
+            // 5. Mutação (já chama o 'repair' dentro dela)
+            mutation(newSon);
+            
+            // 6. Salva o novo filho (reparado) na próxima geração
+            next_gen_pop[i] = *newSon; // Copia os dados do buffer 'newSon'
         }
-        printf("\n");
     }
-    printf("\n");
 }
 
-void printSubPop(Individual *subPop, int index)
+/*
+================================================================================
+4. ATUALIZAÇÃO DA POPULAÇÃO
+   Copia a 'nextPop' (nova geração) de volta para a 'population'
+   e redistribui para as sub-populações.
+================================================================================
+*/
+void updatePop()
 {
-    for (int i = 0; i < SUBPOP_SIZE; i++)
+    // 1. Copia a nova geração (nextPop) para a população principal (population)
+    for (int i = 0; i < POP_SIZE; i++)
     {
-        printf("Id: %d\n", subPop[i].id);
-
-        if (index == 0)
-        {
-            printf("fitness dist: %.4f\n", subPop[i].fitnessDistance);
-        }
-        else if (index == 1)
-        {
-            printf("fitness Time: %.4f\n", subPop[i].fitnessTime);
-        }
-        else if (index == 2)
-        {
-            printf("fitness Fuel: %.4f\n", subPop[i].fitnessFuel);
-        }
-        else if (index == 3)
-        {
-            printf("fitness Ponderado: %.4f\n", subPop[i].fitness);
-        }
-
-        for (int j = 0; j < NUM_VEHICLES; j++)
-        {
-            for (int k = 0; k < NUM_CLIENTS + 1; k++)
-            {
-                printf("%d ", subPop[i].route[j][k]);
-            }
-            printf("\n");
-        }
-        printf("\n");
+        population[i] = nextPop[i]; // Cópia de struct (copia .id, .itens[], .fitness[])
     }
-    printf("\n");
+
+    // 2. Redistribui a 'population' principal de volta para as 
+    // sub-populações (subpop1, subpop2, subpop3)
+    // Isso é crucial para que o 'fitness()' e 'elitism()' da PRÓXIMA geração
+    // tenham os indivíduos corretos.
+    distributeSubpopulation(population);
 }
 
-void calcValsPond(Individual *subPop)
-{
-    // Calculating the average, best fitness and dp from Wheighting
-    double valWeighting = 0;
-    double bestWeightingFitness = __INT_MAX__;
-
-    for (int i = 0; i < SUBPOP_SIZE; i++)
-    {
-        valWeighting += subPop[i].fitness;
-
-        if (subPop[i].fitness < bestWeightingFitness)
-        {
-            bestWeightingFitness = subPop[i].fitness;
-        }
-    }
-
-    double media_val_Weighting = valWeighting / SUBPOP_SIZE;
-
-    double vWeighting = 0;
-    double varianciaWeighting = 0;
-    double dpWeighting = 0;
-    for (int k = 0; k < SUBPOP_SIZE; k++)
-    {
-        double desvio = 0;
-        desvio = subPop[k].fitness - media_val_Weighting;
-        vWeighting += pow(desvio, 2);
-    }
-    varianciaWeighting = vWeighting / SUBPOP_SIZE;
-    dpWeighting = sqrt(varianciaWeighting);
-
-    printf("--------------------Weighting------------------\n");
-    printf("A melhor fitness da subPop Weighting eh: %.4f\n", bestWeightingFitness);
-    printf("A media dos fitness da subPop Weighting eh: %.4f\n", media_val_Weighting);
-    printf("O desvio Padrao da subPop Weighting eh: %.10f\n", dpWeighting);
-    printf("\n");
-}
-
-int verificaDP(Individual *subPop)
-{
-
-    // Calculating the average, best fitness and dp from Wheighting
-    double valWeighting = 0;
-    double bestWeightingFitness = __INT_MAX__;
-
-    for (int i = 0; i < SUBPOP_SIZE; i++)
-    {
-        valWeighting += subPop[i].fitness;
-
-        if (subPop[i].fitness < bestWeightingFitness)
-        {
-            bestWeightingFitness = subPop[i].fitness;
-        }
-    }
-
-    double media_val_Weighting = valWeighting / SUBPOP_SIZE;
-
-    double vWeighting = 0;
-    double varianciaWeighting = 0;
-    double dpWeighting = 0;
-    for (int k = 0; k < SUBPOP_SIZE; k++)
-    {
-        double desvio = 0;
-        desvio = subPop[k].fitness - media_val_Weighting;
-        vWeighting += pow(desvio, 2);
-    }
-    varianciaWeighting = vWeighting / SUBPOP_SIZE;
-    dpWeighting = sqrt(varianciaWeighting);
-
-    // Verificar se o desvio padrão é maior que 0, se for, retorna 1
-    if (dpWeighting > 0.0001)
-    {
-        return 1;
-    }
-
-    return 0;
-}

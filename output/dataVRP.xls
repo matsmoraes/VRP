@@ -33,3 +33,38 @@ A melhor fitness da subPop Weighting eh: 1337.6424
 A media dos fitness da subPop Weighting eh: 1337.6424
 O desvio Padrao da subPop Weighting eh: 0.00000
 1358.03, 1358.03, 1358.03, 1358.03, 1358.03, 1358.03, 1358.03, 1353.73, 1353.73, 1353.73, 1353.73, 1353.73, 1353.73, 1353.73, 1353.73, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64, 1337.64
+
+Population Size: 300
+Number of Vehicles: 2
+Number of Clients: 64
+Vehicle Capacity: 32
+Selection Type: Tournament
+Crossover Points: 1 points
+Mutation Rate: 0.010000
+Elitism Rate: 0.050000
+Rounds: 3000
+Time: 310.560283
+--------------------Distance------------------
+A primeiro fitness da subPop Distancia eh: 740.4214
+A melhor fitness da subPop Distancia eh: 727.1814
+A media dos fitness da subPop Distancia eh: 727.1814
+O desvio Padrao da subPop Distancia eh: 0.00000
+740.42, 740.42, 740.42, 740.42, 740.42, 740.42, 734.94, 734.94, 734.94, 734.94, 734.94, 734.94, 734.94, 734.94, 734.94, 734.94, 730.14, 728.22, 728.22, 728.22, 728.22, 728.22, 728.22, 728.22, 727.18, 727.18, 727.18, 727.18, 727.18, 727.18
+--------------------Time------------------
+A primeiro fitness da subPop Time eh: 7.4042
+A melhor fitness da subPop Time eh: 7.2718
+A media dos fitness da subPop Time eh: 7.2718
+O desvio Padrao da subPop Time eh: 0.00000
+7.40, 7.40, 7.40, 7.40, 7.40, 7.40, 7.35, 7.35, 7.35, 7.35, 7.35, 7.35, 7.35, 7.35, 7.35, 7.35, 7.30, 7.28, 7.28, 7.28, 7.28, 7.28, 7.28, 7.28, 7.27, 7.27, 7.27, 7.27, 7.27, 7.27
+--------------------Fuel------------------
+A primeiro fitness da subPop Fuel eh: 406.8900
+A melhor fitness da subPop Fuel eh: 395.5500
+A media dos fitness da subPop Fuel eh: 395.5500
+O desvio Padrao da subPop Fuel eh: 0.00000
+406.89, 406.89, 406.89, 406.89, 406.89, 406.89, 401.56, 401.56, 401.56, 401.56, 401.56, 401.56, 401.56, 401.56, 401.56, 401.56, 395.55, 395.55, 395.55, 395.55, 395.55, 395.55, 395.55, 395.55, 395.55, 395.55, 395.55, 395.55, 395.55, 395.55
+--------------------Weighting------------------
+A primeiro fitness da subPop Weight eh: 1155.2156
+A melhor fitness da subPop Weighting eh: 1130.5032
+A media dos fitness da subPop Weighting eh: 1130.5032
+O desvio Padrao da subPop Weighting eh: 0.00000
+1155.22, 1155.22, 1155.22, 1155.22, 1155.22, 1155.22, 1144.35, 1144.35, 1144.35, 1144.35, 1144.35, 1144.35, 1144.35, 1144.35, 1144.35, 1144.35, 1133.50, 1131.55, 1131.55, 1131.55, 1131.55, 1131.55, 1131.55, 1131.55, 1130.50, 1130.50, 1130.50, 1130.50, 1130.50, 1130.50

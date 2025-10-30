@@ -1,0 +1,7 @@
+# Ignorar arquivos compilados
+/output/main
+*.o
+
+# Ignorar arquivos de resultado e dados
+*.csv
+*.XLS

@@ -1,197 +1,274 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include <float.h>
-#include "main.h"
-#include "print.h"
-#include "initialization.h"
+#include <time.h>
+#include "../include/main.h" // Inclui o main.h que modificamos
 
 /*
-This part of the code is for initialize the population.
-The initialization is done using the Gillett & Miller algorithm (strategy A).
-
-After initialize, the cromossome will recive the population
+================================================================================
+1. DEFINIÇÃO DAS VARIÁVEIS GLOBAIS
+   Estas são as variáveis declaradas como 'extern' no main.h
+================================================================================
 */
+
+// --- Matrizes da Instância do MOKP ---
+double profits[NUM_OBJETIVOS][NUM_ITENS];
+double weights[NUM_OBJETIVOS][NUM_ITENS];
+double capacities[NUM_OBJETIVOS];
+
+// --- Populações do Algoritmo ---
+Individual *population;
+Individual *parent;
+Individual *tournamentIndividuals;
+Individual *nextPop;
+Individual *newSon;
+
+// --- Sub-populações (Sua lógica AMMT) ---
+// Você precisará adaptar a lógica 'distributeSubpopulation'
+Individual *subpop1;
+Individual *subpop2;
+Individual *subpop3;
+
+// --- Auxiliares do Algoritmo ---
+int *tournamentFitness;
+int *populationFitness;
+int cont;
+
+// Declaração de funções que serão usadas neste arquivo
+void generateInstance();
+int isViable(Individual *ind);
+void repair(Individual *ind);
 
 /*
-    -----------------------------------
-              initPop()
-    -----------------------------------
-
-    This function:
-    - The population is crated using the Gillet & Miller algorithm:
-        - First of all we need to put the coordinates of the distribution center in 50,50;
-        - Then we need to put the coordinates of the clientes in a random way; (just for testing)
-        - Then we will need to calculate the distance between the distribution center and the clients;
-        - Then we need to group all the clients, that way we will group them in order from the closest to the furthest from de distribution center.
-        - Then, using the capacity of each of the vehicles, we will put the vehicles to visit each client, but the number of clients that each vehicle will visit can't
-        be greater than VEHICLES_CAPACITY.
-        - After that we will implement the greedy algorithm for, rather than the vehicle visit the closest client, and then the another closest, and so on
-        the vehicle will visit another client that are closer to the client that he is now, not the closest from the distribution center;
-
+================================================================================
+2. FUNÇÃO PARA GERAR A INSTÂNCIA DO PROBLEMA
+   Baseado nas regras do artigo ZT1999.
+================================================================================
 */
-
-int compare(const void *a, const void *b)
+void generateInstance()
 {
-    Client *coordA = (Client *)a;
-    Client *coordB = (Client *)b;
-    return (coordA->distance > coordB->distance) - (coordA->distance < coordB->distance);
-}
+    printf("Gerando nova instancia MOKP: %d Objetivos, %d Itens...\n", NUM_OBJETIVOS, NUM_ITENS);
 
-double calculateDistance(Client c1, Client c2)
-{
-    return sqrt(pow(c1.x - c2.x, 2) + pow(c1.y - c2.y, 2));
-}
-
-int findClosestClient(int currentClient, Client clients[], int visited[])
-{
-
-    double minDistance = DBL_MAX;
-    int i, closestClient = -1;
-
-    for (i = 0; i < NUM_CLIENTS + 1; i++)
+    for (int i = 0; i < NUM_OBJETIVOS; i++)
     {
-        if (i != currentClient && visited[i] == 0)
+        double total_weight_for_this_knapsack = 0.0;
+        
+        for (int j = 0; j < NUM_ITENS; j++)
         {
-            clients[i].distance = calculateDistance(clients[i], clients[currentClient]);
-            if (clients[i].distance < minDistance)
+            // Gera lucros e pesos aleatórios no intervalo [10, 100]
+            profits[i][j] = (rand() % (PROFIT_MAX - PROFIT_MIN + 1)) + PROFIT_MIN;
+            weights[i][j] = (rand() % (WEIGHT_MAX - WEIGHT_MIN + 1)) + WEIGHT_MIN;
+            
+            total_weight_for_this_knapsack += weights[i][j];
+        }
+
+        // Capacidade é 50% do peso total de todos os itens para esta mochila
+        capacities[i] = 0.5 * total_weight_for_this_knapsack;
+    }
+    printf("Instancia gerada.\n");
+}
+
+/*
+================================================================================
+3. FUNÇÃO DE REPARO (A PARTE MAIS IMPORTANTE)
+   Conserta um indivíduo que excede a capacidade (inviável).
+   Baseado no método "greedy repair" do artigo ZT1999.
+================================================================================
+*/
+
+// Estrutura auxiliar para ordenar os itens pela sua "qualidade"
+typedef struct {
+    int index;    // índice original do item (de 0 a NUM_ITENS-1)
+    double ratio; // Razão lucro/peso (q_j no artigo)
+} ItemRatio;
+
+// Função de comparação para o qsort (ordenar do MENOR para o MAIOR ratio)
+int compareItemRatios(const void *a, const void *b)
+{
+    ItemRatio *itemA = (ItemRatio *)a;
+    ItemRatio *itemB = (ItemRatio *)b;
+    if (itemA->ratio < itemB->ratio) return -1;
+    if (itemA->ratio > itemB->ratio) return 1;
+    return 0;
+}
+
+// Verifica se um indivíduo ultrapassa a capacidade da mochila
+int isViable(Individual *ind)
+{
+    for (int i = 0; i < NUM_OBJETIVOS; i++)
+    {
+        double current_weight = 0.0;
+        for (int j = 0; j < NUM_ITENS; j++)
+        {
+            if (ind->itens[j] == 1)
             {
-                minDistance = clients[i].distance;
-                closestClient = i;
+                current_weight += weights[i][j];
             }
         }
+        
+        // Se exceder a capacidade de QUALQUER mochila, é inviável
+        if (current_weight > capacities[i])
+        {
+            return 0; // 0 = Falso (não é viável)
+        }
     }
-    return closestClient;
+    return 1; // 1 = Verdadeiro (é viável)
 }
 
-void initPop(Individual *population)
+void repair(Individual *ind)
 {
-    // Using the gillet & miller algorithm
-    int i, j, k, l;
-
-    for (int h = 0; h < POP_SIZE; h++)
+    // Se o indivíduo já for viável, não faça nada.
+    if (isViable(ind))
     {
+        return;
+    }
 
-        int visited[NUM_CLIENTS + 1] = {0}; // keep track of visited clients
+    // Se for inviável, precisamos remover itens.
+    // Primeiro, crie uma lista de todos os itens que este indivíduo PEGOU (itens[j] == 1)
+    
+    // Use malloc para alocação dinâmica se NUM_ITENS for muito grande
+    ItemRatio *items_to_check = (ItemRatio *)malloc(NUM_ITENS * sizeof(ItemRatio));
+    if (items_to_check == NULL) {
+        printf("Erro de alocacao de memoria em repair()!\n");
+        exit(1);
+    }
+    
+    int items_count = 0;
 
-        srand(time(NULL)); 
-
-        Client d_center = {RANGE_COORDINATES / 2, RANGE_COORDINATES / 2}; // Distribution center -> Always in the middle of the graph
-
-        // Distribution center
-        clients[0].x = RANGE_COORDINATES / 2;
-        clients[0].y = RANGE_COORDINATES / 2;
-        clients[0].distance = 0.0;
-
-        for (i = 1; i < NUM_CLIENTS + 1; i++)
+    for (int j = 0; j < NUM_ITENS; j++)
+    {
+        if (ind->itens[j] == 1)
         {
-            double x = (double)(rand() % RANGE_COORDINATES);
-            double y = (double)(rand() % RANGE_COORDINATES);
-
-            clients[i].x = x;
-            clients[i].y = y;
-
-            clients[i].distance = calculateDistance(clients[i], d_center);
-        }
-
-        // Sorting the distances, from the closest to the furthest
-        qsort(clients, NUM_CLIENTS + 1, sizeof(Client), compare);
-
-        /*
-        Traversing the clients and grouping them
-        The group will be as follows:
-        The VEHICLE_CAPACITY clients that are closer to the distribution center, will be visited by the first vehicle;
-        The others NUM_CLIENTS clients will be visited by the second vehicle, and so on;
-        That way, if there is less than VEHICLE_CAPACITY clients, they will be visited by the last vehicle, so is possible that the last vehicle will have less than VEHICLE_CAPACITY clients.
-        After grouping the clients, we need to use the Greedy Algorithm to create the initial population.
-        The objective of the Greedy Algorithm is to visit the closest client first, and then the closest to the first client, and so on.
-        The Greedy Algorithm is as follows:
-        */
-
-        int currentClient = 0;
-
-        for (i = 0; i < NUM_VEHICLES; i++)
-        {
-            currentClient = 0;
-            double currentStartTime = MAX_START_TIME;
-
-            for (j = 0; j < VEHICLES_CAPACITY + 1; j++) 
+            // Calcule a razão lucro/peso (q_j) deste item
+            // O artigo ZT1999 define q_j = max(p_ij / w_ij) para todas as mochilas i
+            double max_ratio = 0.0;
+            for (int i = 0; i < NUM_OBJETIVOS; i++)
             {
-
-                if (currentClient < NUM_CLIENTS + 1)
+                // Evita divisão por zero se o peso for 0 (embora nosso mínimo seja 10)
+                if (weights[i][j] > 0) 
                 {
-                    visited[currentClient] = 1;
-
-                    population[h].route[i][j] = currentClient;
-
-                    distance_clients[h].route[i][currentClient] = clients[currentClient].distance;
-
-                    clients[currentClient].start_time = currentStartTime;
-                    clients[currentClient].end_time = fmin(currentStartTime + WINDOW_SIZE, 20.0);
-                    currentStartTime = clients[currentClient].end_time;
-
-                    time_clients_end[h].route[i][currentClient] = clients[currentClient].end_time;
-
-                    int nextClient = findClosestClient(currentClient, clients, visited);
-
-                    // printf("currentClient: %d | nextclient: %d \n", currentClient, nextClient); // if nextclient is -1, is gonna break
-
-                    if (nextClient == -1)
-                        break;
-                    currentClient = nextClient;
+                    double ratio = profits[i][j] / weights[i][j];
+                    if (ratio > max_ratio)
+                    {
+                        max_ratio = ratio;
+                    }
                 }
             }
+            
+            items_to_check[items_count].index = j;
+            items_to_check[items_count].ratio = max_ratio;
+            items_count++;
         }
-
-        // Initializing fitness of every individual
-        population[h].id = h; 
-        population[h].fitness = 0;
-        population[h].fitnessDistance = 0;
-        population[h].fitnessTime = 0;
-        population[h].fitnessFuel = 0;
-        population[h].fitnessCapacity = 0;
     }
+
+    // Ordene os itens que o indivíduo pegou, do PIOR (menor ratio) para o MELHOR (maior ratio)
+    qsort(items_to_check, items_count, sizeof(ItemRatio), compareItemRatios);
+
+    // Agora, remova os itens (começando pelo pior) até o indivíduo se tornar viável
+    for (int k = 0; k < items_count; k++)
+    {
+        // Pega o índice do item com o pior ratio
+        int item_index_to_remove = items_to_check[k].index;
+        
+        // Remove o item (seta para 0)
+        ind->itens[item_index_to_remove] = 0;
+
+        // Verifica se o indivíduo agora é viável
+        if (isViable(ind))
+        {
+            break; // O indivíduo foi reparado, saia do loop
+        }
+    }
+    
+    // Libera a memória alocada
+    free(items_to_check);
 }
 
-// Even if in that case all the individual in the initial population are equal, the correct way to divide it is selecting different individuals, not the same always
-void distributeSubpopulation(Individual *population)
+
+/*
+================================================================================
+4. INICIALIZAÇÃO DA POPULAÇÃO
+   Cria a população inicial de indivíduos aleatórios e VIÁVEIS.
+================================================================================
+*/
+void initPop(Individual *population_ptr) // Renomeado para evitar conflito com a var global
 {
+    (void)population_ptr;
+
+    // Inicializa a semente do gerador aleatório
+    srand(time(NULL));
+
+    // 1. Gera os dados do problema (lucros, pesos, capacidades)
+    generateInstance();
+
+    // 2. Aloca memória para a população
+    population = (Individual *)malloc(POP_SIZE * sizeof(Individual));
+    parent = (Individual *)malloc(POP_SIZE * sizeof(Individual));
+    tournamentIndividuals = (Individual *)malloc(QUANTITYSELECTEDTOURNAMENT * sizeof(Individual));
+    nextPop = (Individual *)malloc(POP_SIZE * sizeof(Individual));
+    newSon = (Individual *)malloc(sizeof(Individual));
+    
+    // Alocar memória para sub-populações 
+    subpop1 = (Individual *)malloc(SUBPOP_SIZE * sizeof(Individual));
+    subpop2 = (Individual *)malloc(SUBPOP_SIZE * sizeof(Individual));
+    subpop3 = (Individual *)malloc(SUBPOP_SIZE * sizeof(Individual));
+
+    // 3. Cria cada indivíduo da população
+    printf("Inicializando populacao de %d individuos...\n", POP_SIZE);
+    for (int k = 0; k < POP_SIZE; k++)
+    {
+        population[k].id = k;
+        
+        // Cria um vetor binário aleatório
+        for (int j = 0; j < NUM_ITENS; j++)
+        {
+            population[k].itens[j] = rand() % 2; // 50% de chance de ser 0 ou 1
+        }
+
+        // 4. REPARA o indivíduo para garantir que ele seja viável
+        repair(&population[k]);
+        
+        // O fitness será calculado pela função 'fitness' separadamente
+        for(int obj = 0; obj < NUM_OBJETIVOS; obj++) {
+            population[k].fitness[obj] = 0.0;
+        }
+    }
+    printf("Populacao inicial criada e reparada.\n");
+}
+
+
+void distributeSubpopulation(Individual *population_ptr)
+{
+    (void)population_ptr;
+    printf("Adaptando distributeSubpopulation...\n");
 
     for (int i = 0; i < POP_SIZE; i++)
     {
-        int index = i / SUBPOP_SIZE;
+        int index = i / SUBPOP_SIZE; // Será 0, 1, ou 2
         int index2 = i % SUBPOP_SIZE;
-
-
-        for (int j = 0; j < NUM_VEHICLES; j++)
+        
+        // Assumindo 3 sub-populações para 3 objetivos (AGORA CORRETO)
+        switch (index)
         {
-            for (int k = 0; k < NUM_CLIENTS + 1; k++)
-            {
-                switch (index)
-                {
-                case 0:
-                    subPopDistance[index2].route[j][k] = population[i].route[j][k];
-                    subPopDistance[index2].id = population[i].id;
-                    break;
-
-                case 1:
-                    subPopTime[index2].route[j][k] = population[i].route[j][k];
-                    subPopTime[index2].id = population[i].id;
-                    break;
-
-                case 2:
-                    subPopFuel[index2].route[j][k] = population[i].route[j][k];
-                    subPopFuel[index2].id = population[i].id;
-                    break;
-
-                default:
-                    break;
+            case 0: // Subpop Foco Objetivo 1 (fitness[0])
+                subpop1[index2].id = population[i].id;
+                for(int j=0; j<NUM_ITENS; j++) {
+                    subpop1[index2].itens[j] = population[i].itens[j];
                 }
+                break;
 
-                // Adding individual to subPopWeighting (it will be any individual, even if it already is on another subpop)
-                subPopWeighting[index2].route[j][k] = population[i].route[j][k];
-                subPopWeighting[index2].id = population[i].id;
-            }
+            case 1: // Subpop Foco Objetivo 2 (fitness[1])
+                subpop2[index2].id = population[i].id;
+                 for(int j=0; j<NUM_ITENS; j++) {
+                    subpop2[index2].itens[j] = population[i].itens[j];
+                }
+                break;
+            
+            case 2: // Subpop Foco Objetivo 3 (fitness[2]) 
+                subpop3[index2].id = population[i].id;
+                 for(int j=0; j<NUM_ITENS; j++) {
+                    subpop3[index2].itens[j] = population[i].itens[j];
+                }
+                break;
         }
     }
 }
