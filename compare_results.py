@@ -33,7 +33,7 @@ except Exception as e:
 
 hv_nsga3_paper = 0.020 
 
-algoritmos = ['AMMT (Seu Trabalho)', 'NSGA-III (Artigo)']
+algoritmos = ['AMMT', 'NSGA-III (Artigo)']
 valores_hv = [hv_ammt_normalized, hv_nsga3_paper]
 cores = ['#4CAF50', '#2196F3'] # Verde vs Azul
 
