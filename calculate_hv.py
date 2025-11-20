@@ -2,13 +2,18 @@ import numpy as np
 from pymoo.indicators.hv import HV
 
 try:
-    # Define o Ponto de Referência
-    # O Hypervolume precisa de um "pior ponto" como referência.
-    ref_point = np.array([0, 0, 0])
-
     # Carrega os dados do arquivo CSV
-    # skiprows=1 pula o cabeçalho ("Obj1_Lucro", etc.)
     data = np.loadtxt("final_pareto_front.csv", delimiter=",", skiprows=1)
+
+    # --- CORREÇÃO CRÍTICA ---
+    # A pymoo assume minimização. Como estamos maximizando lucro,
+    # invertemos o sinal dos dados para calcular o volume corretamente.
+    data = data * -1 
+    # ------------------------
+
+    # Define o Ponto de Referência
+    # Como invertemos os dados para negativos, o 0 continua sendo um bom
+    ref_point = np.array([0, 0, 0])
 
     # Inicializa o calculador de Hypervolume
     ind = HV(ref_point=ref_point)
@@ -19,7 +24,7 @@ try:
     print("\n--- Calculo do Hypervolume ---")
     print(f"Ponto de Referencia: {ref_point}")
     print(f"Solucoes da Fronteira: {len(data)}")
-    print(f"Hypervolume (HV): {hv_value}")
+    print(f"Hypervolume (HV): {hv_value:.4e}") 
     print("----------------------------------")
 
 except FileNotFoundError:
