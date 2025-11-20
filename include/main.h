@@ -51,7 +51,7 @@ extern Individual *tournamentIndividuals;
 extern Individual *nextPop;
 extern Individual *newSon;
 
-// Lógica de Sub-população (do seu AMMT)
+// Lógica de Sub-população 
 extern Individual *subpop1;
 extern Individual *subpop2;
 extern Individual *subpop3;
