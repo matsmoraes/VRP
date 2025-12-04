@@ -6,7 +6,7 @@
 // --- PARÂMETROS DO PROBLEMA DA MOCHILA (MOKP) ---
 // Baseado nos artigos ZT1999 e OLA2019
 #define NUM_OBJETIVOS 3 // Número de mochilas (ex: 2, 3, ou 4)
-#define NUM_ITENS 1000
+#define NUM_ITENS 250
 
 // Parâmetros para geração de instâncias (ZT1999)
 #define PROFIT_MIN 10
@@ -17,9 +17,9 @@
 // --- PARÂMETROS DO AMMT ---
 #define POP_SIZE 93
 #define ELITISMRATE 0.05
-#define MUTATIONRATE (1.0 / (double)NUM_ITENS) // Taxa de mutação (ex: 1/NUM_ITENS)
+#define MUTATIONRATE 0.05
 #define ROUNDS 300
-#define SELECTION 1    // 1- Roulette. 2- Tournament
+#define SELECTION 2
 #define CROSSINGTYPE 1 // 1- One Crossing point. 2 - Two Crossing points
 
 // Lógica de Sub-população 

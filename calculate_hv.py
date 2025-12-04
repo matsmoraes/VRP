@@ -3,18 +3,19 @@ import sys
 import os
 from pymoo.indicators.hv import HV
 
-OUTPUT_FILE = "all_hv_results.txt"
 
 if len(sys.argv) > 1:
     n_items = int(sys.argv[1])
 else:
-    n_items = 750 # Fallback
+    n_items = 750
 
 max_theoretical_profit = n_items * 100.0
 
 try:
     if not os.path.exists("final_pareto_front.csv"):
-        raise FileNotFoundError("Arquivo final_pareto_front.csv não encontrado.")
+        # Se não existir, imprime 0.0 e encerra
+        print("0.0")
+        sys.exit(0)
 
     raw_data = np.loadtxt("final_pareto_front.csv", delimiter=",", skiprows=1)
 
@@ -30,10 +31,7 @@ try:
     ind = HV(ref_point=ref_point)
     hv_value = ind(data_for_hv)
 
-
-    with open(OUTPUT_FILE, "a") as f:
-        f.write(f"{hv_value}\n")
+    print(f"{hv_value}")
 
 except Exception as e:
-    with open(OUTPUT_FILE, "a") as f:
-        f.write(f"0.0\n")
+    print("0.0")
