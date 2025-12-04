@@ -1,14 +1,14 @@
 #!/bin/bash
 
-
 rm -f all_hv_results.txt
 
-echo "Iniciando experimento de 10 execuções..."
+TOTAL_RUNS=30
 
-for i in {1..10}
+echo "Iniciando experimento de $TOTAL_RUNS execuções (simulando 30 instâncias aleatórias)..."
+
+for i in $(seq 1 $TOTAL_RUNS)
 do
-   echo "Execucao $i de 10..."
-   
+   echo "Execucao $i de $TOTAL_RUNS..."
    
    ./output/main > /dev/null 
    
