@@ -22,7 +22,7 @@ do
         ./output/main > /dev/null 
         
         
-        python calculate_hv.py
+        python calculate_hv.py $size
     done
     
     

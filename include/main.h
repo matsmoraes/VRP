@@ -6,7 +6,7 @@
 // --- PARÂMETROS DO PROBLEMA DA MOCHILA (MOKP) ---
 // Baseado nos artigos ZT1999 e OLA2019
 #define NUM_OBJETIVOS 3 // Número de mochilas (ex: 2, 3, ou 4)
-#define NUM_ITENS 750     // Número de itens (ex: 250, 500, ou 750)
+#define NUM_ITENS 1000
 
 // Parâmetros para geração de instâncias (ZT1999)
 #define PROFIT_MIN 10
