@@ -1,71 +1,76 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
+sizes = [250, 500, 750, 1000]
+files = [f"results_{s}_items.txt" for s in sizes]
 
-nsga3_min = 0.009
-nsga3_max = 0.034
-nsga3_avg = 0.020
-nsga3_stats = [nsga3_min, nsga3_max, nsga3_avg]
+# --- DADOS APROXIMADOS DO ARTIGO (E-NSGA-III - Barras Vermelhas Fig. 3) ---
+paper_means = {
+    250: 0.076, 
+    500: 0.028, 
+    750: 0.020, 
+    1000: 0.014 
+}
 
+my_means = []
+paper_values = []
 
-try:
+print("\n--- RESUMO DO BENCHMARK ---")
+
+for s, filename in zip(sizes, files):
+    if os.path.exists(filename):
+        try:
+            with open(filename, "r") as f:
+                raw_values = [float(line.strip()) for line in f if line.strip()]
+                
+            if not raw_values:
+                print(f"Aviso: {filename} está vazio. Usando 0.0.")
+                my_means.append(0.0)
+            else:
+                avg_hv = np.mean(raw_values) 
+                my_means.append(avg_hv)
+                
+                print(f"Tamanho {s}: Seu HV Médio = {avg_hv:.4f} | Artigo = {paper_means[s]:.4f}")
+                
+        except Exception as e:
+            print(f"Erro ao ler {filename}: {e}")
+            my_means.append(0.0)
+    else:
+        print(f"Arquivo {filename} não encontrado. Rodou o benchmark completo?")
+        my_means.append(0.0)
     
-    with open("all_hv_results.txt", "r") as f:
-        raw_values = [float(line.strip()) for line in f]
-    
-    if not raw_values: raise ValueError("Arquivo vazio")
-
-    
-    max_theoretical_vol = 75000.0 ** 3
-    
-    # Normaliza seus dados para a escala 0-1
-    normalized_values = [val / max_theoretical_vol for val in raw_values]
-
-    # Calcula as estatísticas
-    ammt_min = np.min(normalized_values)
-    ammt_max = np.max(normalized_values)
-    ammt_avg = np.mean(normalized_values)
-    ammt_stats = [ammt_min, ammt_max, ammt_avg]
-
-    print(f"Seus Dados (Normalizados): Min={ammt_min:.4f}, Max={ammt_max:.4f}, Avg={ammt_avg:.4f}")
-
-except Exception as e:
-    print(f"Erro ao ler dados: {e}. Usando dados simulados.")
-    ammt_stats = [0.015, 0.040, 0.025] # Valores dummy se der erro
+    paper_values.append(paper_means[s])
 
 
-labels = ['Mínimo', 'Máximo', 'Média']
-x = np.arange(len(labels))
-width = 0.35  
+x = np.arange(len(sizes))
+width = 0.35
 
-fig, ax = plt.subplots(figsize=(10, 6))
+fig, ax = plt.subplots(figsize=(12, 6))
 
+rects1 = ax.bar(x - width/2, my_means, width, label='Seu Código (AMMT)', color='#4CAF50', edgecolor='black')
+rects2 = ax.bar(x + width/2, paper_values, width, label='Artigo (E-NSGA-III)', color='#F44336', edgecolor='black')
 
-rects1 = ax.bar(x - width/2, ammt_stats, width, label='AMMT', color='#4CAF50', edgecolor='black')
-
-
-rects2 = ax.bar(x + width/2, nsga3_stats, width, label='NSGA-III (Artigo)', color='#2196F3', edgecolor='black')
-
-ax.set_ylabel('Hypervolume (Normalizado)')
-ax.set_title('Comparação Estatística: AMMT vs NSGA-III\n(30 Execuções, 750 Itens)')
+ax.set_ylabel('Hypervolume Médio (Normalizado)')
+ax.set_xlabel('Número de Itens (Tamanho do Problema)')
+ax.set_title('Benchmark Completo: AMMT vs Artigo (30 Execuções por tamanho)')
 ax.set_xticks(x)
-ax.set_xticklabels(labels, fontsize=12)
+ax.set_xticklabels(sizes)
 ax.legend()
 ax.grid(axis='y', linestyle='--', alpha=0.5)
-
 
 def autolabel(rects):
     for rect in rects:
         height = rect.get_height()
         ax.annotate(f'{height:.3f}',
                     xy=(rect.get_x() + rect.get_width() / 2, height),
-                    xytext=(0, 3),  
+                    xytext=(0, 3),
                     textcoords="offset points",
-                    ha='center', va='bottom', fontweight='bold')
+                    ha='center', va='bottom', fontsize=10, fontweight='bold')
 
 autolabel(rects1)
 autolabel(rects2)
 
 plt.tight_layout()
-plt.savefig('grafico_comparativo_final.png')
-print("Gráfico salvo como 'grafico_comparativo_final.png'")
+plt.savefig('benchmark_completo.png')
+print("\nGráfico salvo como 'benchmark_completo.png'")
